@@ -436,6 +436,9 @@ class DataMerge():
     def append_other_data(self):
         self.merged_data = self.merged_data.merge(self.profile, on="person", how="left")
         self.merged_data = self.merged_data.merge(self.portfolio, on=["offer_id", "duration"], how="left")
+        self.merged_data = self.merged_data.dropna(subset=['gender', 'age', 'person', 'became_member_on',
+                                                           'income', 'membership_days', 'membership_month', 'membership_year'])
+        self.merged_data = self.merged_data.reset_index(drop = True)
 
         return self.merged_data
 
