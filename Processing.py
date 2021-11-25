@@ -465,3 +465,21 @@ def offer_performance(merged_data):
     plt.ylabel("Success Rate", fontsize=15)
     plt.grid()
     plt.show()
+    
+def correlation_map(data, features):
+    cor_df = data[features].corr()
+    # Generate a mask for the upper triangle
+    mask = np.triu(np.ones_like(cor_df, dtype=bool))
+    
+    # Set up the matplotlib figure
+    f, ax = plt.subplots(figsize=(16, 12))
+
+    # Generate a custom diverging colormap
+    cmap = sns.diverging_palette(230, 20, as_cmap=True)
+
+    # Draw the heatmap with the mask and correct aspect ratio
+    sns.heatmap(cor_df, mask=mask, cmap=cmap, vmax=.3, center=0,
+            square=True, linewidths=.5, cbar_kws={"shrink": .5},  xticklabels=True, yticklabels=True)
+    plt.show()
+    return cor_df
+    
