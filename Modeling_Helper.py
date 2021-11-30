@@ -185,5 +185,72 @@ def bayesian_objective(trial, data, features, y_var, scale_pos_weight_val):
 
     return gbm_gs.best_score_
 
+
+
+class BayesianOpt(object):
+    def __init__(
+        self,
+        train_data,
+        features,
+        y_var,
+        scale_pos_weight_val,
+    ):
+        """
+        Initialises DataPrep
+        This class is used to prepare the data
+
+        :param portfolio_path: (str) path to portfolio data
+        :param profile_path: (str) path to profile data
+        :param transcript_path: (str) path to transcript
+
+        """
+
+        self.train_data = train_data
+        self.features = features
+        self.y_var = y_var
+        self.scale_pos_weight_val = scale_pos_weight_val
         
+    def __call__(self, trial):
+    
+        learning_rate = trial.suggest_float("learning_rate", 1e-3, 0.4, log = True)
+        num_leaves = trial.suggest_int("num_leaves", 2, 60)
+        colsample_bytree = trial.suggest_float("colsample_bytree", 0.2,1)
+        reg_alpha = trial.suggest_float("reg_alpha", 1e-2, 5, log = True)
+        reg_lambda = trial.suggest_float("reg_lambda", 1e-2, 5, log = True)
+        max_depth = trial.suggest_int("max_depth", 2, 30)
+        min_child_samples = trial.suggest_int("min_child_samples", 50, 600)
+        subsample = trial.suggest_float("subsample", 0.2,1)
+        n_estimators = trial.suggest_int("n_estimators", 500, 2000) 
+
+        param ={
+            'learning_rate': [learning_rate],
+            'num_leaves': [num_leaves],
+            'colsample_bytree': [colsample_bytree],
+            'reg_alpha': [reg_alpha],
+            'reg_lambda': [reg_lambda],
+            'max_depth':[max_depth],
+            'min_child_samples': [min_child_samples], 
+            'subsample': [subsample],
+            'n_estimators': [n_estimators],
+            'verbose': [-1]
+                }
+
+
+        gbm_model = lgb.LGBMClassifier(objective = "binary", 
+                                       metric = ["auc", "binary_error"], 
+                                       random_state=2021, 
+                                       n_jobs=-1, 
+                                       scale_pos_weight = self.scale_pos_weight_val,
+                                  )
+        gbm_gs = dcv.GridSearchCV(
+            estimator=gbm_model, param_grid=param, 
+            scoring='f1',
+            cv=5,
+            refit=True,
+        )
+
+        gbm_gs.fit(self.train_data[self.features], self.train_data[self.y_var], )
+
+        return gbm_gs.best_score_
+       
 
