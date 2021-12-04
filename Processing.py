@@ -446,21 +446,30 @@ class DataMerge():
         self.merged_data.to_csv("./data/merged_data.csv")
 
 
-def offer_performance(merged_data):
-    offers = merged_data.groupby(["offer_id"])["tried_offer", "successful_offer"].mean().reset_index()
+def offer_performance(data, by_var):
+    
+    if by_var == 'age':
+        data['age_groups'] = pd.qcut(data['age'], 5, labels=["very_young", "young", "middle_age", "old", "very_old"])
+        by_var = 'age_groups'
+    if by_var == 'income':
+        data['income_groups'] = pd.qcut(data['income'], 5, labels=["very low", "low", "medium", "high", "very high"])
+        by_var = 'income_groups'
+        
+    output = data.groupby([by_var])["tried_offer", "successful_offer"].mean().reset_index()
 
     plt.figure(figsize=(20, 5))
     plt.subplots_adjust(wspace=0.3)
     plt.subplot(1, 2, 1)
     plt.rc("axes", axisbelow=True)
 
-    plt.bar(offers["offer_id"], offers["tried_offer"], color="teal")
+    plt.bar(output[by_var], output["tried_offer"], color="teal")
     plt.xticks(rotation=90)
+    plt.xlabel(by_var, fontsize = 15)
     plt.ylabel("Trying Rate", fontsize=15)
     plt.grid()
 
     plt.subplot(1, 2, 2)
-    plt.bar(offers["offer_id"], offers["successful_offer"], color="teal")
+    plt.bar(output[by_var], output["successful_offer"], color="teal")
     plt.xticks(rotation=90)
     plt.ylabel("Success Rate", fontsize=15)
     plt.grid()
