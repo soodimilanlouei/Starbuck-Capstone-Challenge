@@ -15,7 +15,81 @@ import warnings
 warnings.simplefilter('always', category=UserWarning)
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
+class DataPrep:
+    def __init__(
+        self,
+        data_path = './data/merged_data.csv',
+        cont_vars = [
+            'duration',
+            'num_channels',
+            'channel_mobile', 
+            'channel_social', 
+            'channel_web',
+            'age',  
+            'income',
+            'membership_days',
+            'difficulty'],
+        cat_vars = [
+            'offer_id',
+            'offer_type',
+            'offer_reward',
+            'gender', 
+            'membership_month', 
+            'membership_year'],
+        y_var = 'successful_offer'
+    
+    ):
+        """
+        Initialises DataPrep
+        This class is used to prepare the data
 
+        :param portfolio_path: (str) path to portfolio data
+        :param profile_path: (str) path to profile data
+        :param transcript_path: (str) path to transcript
+
+        """
+        self.data_path = data_path
+        self.data = pd.read_csv(self.data_path)
+        self.cont_vars = cont_vars
+        self.cat_vars = cat_vars
+        self.y_var = y_var
+    
+        self.modeling_data = self.data[[
+                'person',
+                'offer_id',
+                'time_received',
+                'offer_type',
+                'duration',
+                'offer_reward',
+                'difficulty',
+                'num_channels',
+                'channel_email', 
+                'channel_mobile', 
+                'channel_social', 
+                'channel_web',
+                'gender', 
+                'age',  
+                'income',
+                'membership_days',
+                'membership_month', 
+                'membership_year',
+                'successful_offer'   
+            ]]
+
+        self.features = self.cont_vars+self.cat_vars
+    
+    def prep_data_logistic(self):
+        for i in self.cat_vars:
+            y = pd.get_dummies(self.modeling_data[i], prefix=i, drop_first=True)
+            y = y.astype('int64')
+            self.features = self.features + y.columns.tolist()
+            self.features = [x for x in self.features if x != i]
+            self.modeling_data = pd.concat([self.modeling_data, y], axis=1)
+            
+    def prep_data_gbm(self):
+        for i in self.cat_vars:
+            self.modeling_data.loc[:, i] = self.modeling_data[i].astype('category')
+            
 
 class PerformanceAnalysis:
     def __init__(
