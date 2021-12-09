@@ -216,48 +216,6 @@ class DataSplit:
         
         return self.train_df, self.test_df
     
-def bayesian_objective(trial, data, features, y_var, scale_pos_weight_val):
-
-    learning_rate = trial.suggest_float("learning_rate", 1e-3, 0.4, log = True)
-    num_leaves = trial.suggest_int("num_leaves", 2, 60)
-    colsample_bytree = trial.suggest_float("colsample_bytree", 0.2,1)
-    reg_alpha = trial.suggest_float("reg_alpha", 1e-2, 5, log = True)
-    reg_lambda = trial.suggest_float("reg_lambda", 1e-2, 5, log = True)
-    max_depth = trial.suggest_int("max_depth", 2, 30)
-    min_child_samples = trial.suggest_int("min_child_samples", 50, 600)
-    subsample = trial.suggest_float("subsample", 0.2,1)
-    n_estimators = trial.suggest_int("n_estimators", 500, 2000) 
-
-    param ={
-        'learning_rate': [learning_rate],
-        'num_leaves': [num_leaves],
-        'colsample_bytree': [colsample_bytree],
-        'reg_alpha': [reg_alpha],
-        'reg_lambda': [reg_lambda],
-        'max_depth':[max_depth],
-        'min_child_samples': [min_child_samples], 
-        'subsample': [subsample],
-        'n_estimators': [n_estimators],
-        'verbose': [-1]
-            }
-
-
-    gbm_model = lgb.LGBMClassifier(objective = "binary", 
-                                   metric = ["auc", "binary_error"], 
-                                   random_state=2021, 
-                                   n_jobs=-1, 
-                                   scale_pos_weight = scale_pos_weight_val,
-                              )
-    gbm_gs = dcv.GridSearchCV(
-        estimator=gbm_model, param_grid=param, 
-        scoring='f1',
-        cv=5,
-        refit=True,
-    )
-
-    gbm_gs.fit(data[features], data[y_var], )
-
-    return gbm_gs.best_score_
 
 
 
@@ -326,5 +284,12 @@ class BayesianOpt(object):
         gbm_gs.fit(self.train_data[self.features], self.train_data[self.y_var], )
 
         return gbm_gs.best_score_
+    
+def performance_comparison(performance_dict):
+    print ('Improvement in AUC: ', round((performance_dict['gbm']['auc']-performance_dict['logisitc']['auc'])*100/performance_dict['logisitc']['auc'], 2), '%')
+    print ('Improvement in Accuracy: ', round((performance_dict['gbm']['accuracy']-performance_dict['logisitc']['accuracy'])*100/performance_dict['logisitc']['accuracy'], 2), '%')
+    print ('Improvement in Precision: ', round((performance_dict['gbm']['precision']-performance_dict['logisitc']['precision'])*100/performance_dict['logisitc']['precision'], 2), '%')
+    print ('Improvement in Recall: ', round((performance_dict['gbm']['recall']-performance_dict['logisitc']['recall'])*100/performance_dict['logisitc']['recall'], 2), '%')
+    print ('Improvement in F1 Score: ', round((performance_dict['gbm']['f1_score']-performance_dict['logisitc']['f1_score'])*100/performance_dict['logisitc']['f1_score'], 2), '%')
        
 
