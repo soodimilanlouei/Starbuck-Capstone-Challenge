@@ -13,7 +13,7 @@ warnings.simplefilter("always", category=UserWarning)
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 
-class DataPrep():
+class DataPrep:
     def __init__(
             self,
             portfolio_path: str = "data/portfolio.json",
@@ -30,13 +30,16 @@ class DataPrep():
 
         """
 
-        # read in the json files
         self.portfolio = pd.read_json(portfolio_path, orient="records", lines=True)
         self.profile = pd.read_json(profile_path, orient="records", lines=True)
         self.transcript = pd.read_json(transcript_path, orient="records", lines=True)
         self.new_ids = {}
 
     def portfolio_prep(self):
+        """
+        Prepare the portfolio data.
+
+        """
         self.portfolio = pd.concat([self.portfolio[["reward", "difficulty", "duration", "offer_type", "id"]],
                                     pd.get_dummies(self.portfolio["channels"].apply(pd.Series),
                                                    prefix="channel")], axis=1)
@@ -72,6 +75,10 @@ class DataPrep():
         return self.portfolio
 
     def profile_prep(self):
+        """
+        Prepare the profile data.
+
+        """
         original_ids = self.profile["id"].unique()
         for counter in range(len(original_ids)):
             self.new_ids[original_ids[counter]] = "user_" + str(counter + 1)
@@ -94,6 +101,10 @@ class DataPrep():
         return self.profile
 
     def transcript_prep(self):
+        """
+        Prepare the transcript data.
+
+        """
         self.transcript = pd.concat(
             [self.transcript.drop(["value"], axis=1), self.transcript["value"].apply(pd.Series)], axis=1)
         self.transcript["offer_id"] = np.where(self.transcript["offer id"].isnull(), self.transcript["offer_id"],
@@ -129,7 +140,7 @@ class DataPrep():
         return self.transcript
 
 
-class DataDescription():
+class DataDescription:
     def __init__(
             self,
             portfolio: DataFrame,
@@ -137,8 +148,8 @@ class DataDescription():
             transcript: DataFrame
     ):
         """
-        Initialises PrepTrainingData
-        This class is used to build the model features
+        Initialises DataDescription
+        This class is used to visualize the data
 
         :param portfolio: (dataframe) portfolio data
         :param profile: (dataframe) profile data
@@ -150,17 +161,33 @@ class DataDescription():
         self.transcript = transcript
 
     def describe_portfolio(self):
+        """
+        Describe the portfolio data.
+
+        """
         describe_portfolio_plot(self.portfolio)
 
     def describe_profile(self):
+        """
+        Describe the profile data.
+
+        """
         describe_profile_categorical(self.profile)
         describe_profile_continuous(self.profile)
 
     def describe_transcript(self):
+        """
+        Describe the transcript data.
+
+        """
         describe_transcript_plot(self.transcript)
 
 
 def describe_portfolio_plot(portfolio):
+    """
+    Plot various features of the portfolio data.
+
+    """
     plt.figure(figsize=(18, 5))
     plt.subplot(1, 3, 1)
     plt.rc("axes", axisbelow=True)
@@ -187,6 +214,10 @@ def describe_portfolio_plot(portfolio):
 
 
 def describe_profile_categorical(profile):
+    """
+    Plot the categorical features of the profile data.
+
+    """
     plt.figure(figsize=(20, 5))
     plt.subplots_adjust(wspace=0.3)
     plt.subplot(1, 3, 1)
@@ -229,6 +260,10 @@ def describe_profile_categorical(profile):
 
 
 def describe_profile_continuous(profile):
+    """
+    Plot the continuous features of the profile data.
+
+    """
     fig, (ax1, ax2, ax3) = plt.subplots(ncols=3, sharey=False, figsize=(20, 6))
 
     p = sns.kdeplot(data=profile, x="age", shade=True, color="teal", ax=ax1, bw=0.3)
@@ -261,6 +296,10 @@ def describe_profile_continuous(profile):
 
 
 def describe_transcript_plot(transcript):
+    """
+    Plot the transcript data.
+
+    """
     plt.figure(figsize=(20, 5))
     plt.subplots_adjust(wspace=0.3)
     plt.subplot(1, 3, 1)
@@ -310,7 +349,7 @@ def describe_transcript_plot(transcript):
     plt.show()
 
 
-class DataMerge():
+class DataMerge:
     def __init__(
             self,
             portfolio: DataFrame,
@@ -318,8 +357,8 @@ class DataMerge():
             transcript: DataFrame
     ):
         """
-        Initialises PrepTrainingData
-        This class is used to build the model features
+        Initialises DataMerge
+        This class is used to merge all the datasets together
 
         :param portfolio: (dataframe) portfolio data
         :param profile: (dataframe) profile data
@@ -331,11 +370,17 @@ class DataMerge():
         self.transcript = transcript
 
     def data_merge(self):
-        offer_received = self.transcript[self.transcript["event"] == "offer_received"].copy(deep=True).reset_index(drop=True)
+        """
+        Reformat the transcript data.
+
+        """
+        offer_received = self.transcript[self.transcript["event"] == "offer_received"].copy(deep=True).reset_index(
+            drop=True)
         offer_received = offer_received.drop(["amount", "event"], axis=1)
         offer_received.rename(columns={"time": "time_received", "reward": "original_reward"}, inplace=True)
 
-        offer_viewed = self.transcript[self.transcript["event"] == "offer_viewed"].copy(deep=True).reset_index(drop=True)
+        offer_viewed = self.transcript[self.transcript["event"] == "offer_viewed"].copy(deep=True).reset_index(
+            drop=True)
         offer_viewed = offer_viewed.drop(["amount", "event", "reward"], axis=1)
         offer_viewed.rename(columns={"time": "time_viewed"}, inplace=True)
 
@@ -343,7 +388,8 @@ class DataMerge():
         transaction = transaction.drop(["event", "reward", "offer_id"], axis=1)
         transaction.rename(columns={"time": "time_transaction"}, inplace=True)
 
-        offer_completed = self.transcript[self.transcript["event"] == "offer_completed"].copy(deep=True).reset_index(drop=True)
+        offer_completed = self.transcript[self.transcript["event"] == "offer_completed"].copy(deep=True).reset_index(
+            drop=True)
         offer_completed = offer_completed.drop(["event", "amount"], axis=1)
         offer_completed.rename(columns={"time": "time_completed"}, inplace=True)
 
@@ -361,6 +407,10 @@ class DataMerge():
         return self.merged_data
 
     def remove_redundant_data(self):
+        """
+        Remove the observations that are redundantly created in the merge step
+
+        """
         self.merged_data = self.merged_data[
             ((self.merged_data["time_viewed"].isnull()) & (self.merged_data["time_completed"].isnull())) |
             ((self.merged_data["time_viewed"] >= self.merged_data["time_received"]) & (
@@ -377,6 +427,10 @@ class DataMerge():
         return self.merged_data
 
     def find_success_tried_offers(self):
+        """
+        Specify whether an offer has been tried or has been successful.
+
+        """
         not_viewed_data = self.merged_data[self.merged_data["time_viewed"].isnull()].reset_index(drop=True)
         not_viewed_data = not_viewed_data.sort_values(
             by=["person", "offer_id", "time_received", "time_transaction"]).reset_index(drop=True)
@@ -434,27 +488,39 @@ class DataMerge():
         return self.merged_data
 
     def append_other_data(self):
+        """
+        Append other datasets to create a unified view
+
+        """
         self.merged_data = self.merged_data.merge(self.profile, on="person", how="left")
         self.merged_data = self.merged_data.merge(self.portfolio, on=["offer_id", "duration"], how="left")
-        self.merged_data = self.merged_data.dropna(subset=['gender', 'age', 'person', 'became_member_on',
-                                                           'income', 'membership_days', 'membership_month', 'membership_year'])
-        self.merged_data = self.merged_data.reset_index(drop = True)
+        self.merged_data = self.merged_data.dropna(subset=["gender", "age", "person", "became_member_on",
+                                                           "income", "membership_days", "membership_month",
+                                                           "membership_year"])
+        self.merged_data = self.merged_data.reset_index(drop=True)
 
         return self.merged_data
 
     def save_data(self):
+        """
+        Save the final dataset
+
+        """
         self.merged_data.to_csv("./data/merged_data.csv")
 
 
 def offer_performance(data, by_var):
-    
-    if by_var == 'age':
-        data['age_groups'] = pd.qcut(data['age'], 5, labels=["very_young", "young", "middle_age", "old", "very_old"])
-        by_var = 'age_groups'
-    if by_var == 'income':
-        data['income_groups'] = pd.qcut(data['income'], 5, labels=["very low", "low", "medium", "high", "very high"])
-        by_var = 'income_groups'
-        
+    """
+    Plot the performance of each offer for various segmentations.
+
+    """
+    if by_var == "age":
+        data["age_groups"] = pd.qcut(data["age"], 5, labels=["very_young", "young", "middle_age", "old", "very_old"])
+        by_var = "age_groups"
+    if by_var == "income":
+        data["income_groups"] = pd.qcut(data["income"], 5, labels=["very low", "low", "medium", "high", "very high"])
+        by_var = "income_groups"
+
     output = data.groupby([by_var])["tried_offer", "successful_offer"].mean().reset_index()
 
     plt.figure(figsize=(20, 5))
@@ -464,7 +530,7 @@ def offer_performance(data, by_var):
 
     plt.bar(output[by_var], output["tried_offer"], color="teal")
     plt.xticks(rotation=90)
-    plt.xlabel(by_var, fontsize = 15)
+    plt.xlabel(by_var, fontsize=15)
     plt.ylabel("Trying Rate", fontsize=15)
     plt.grid()
 
@@ -474,21 +540,19 @@ def offer_performance(data, by_var):
     plt.ylabel("Success Rate", fontsize=15)
     plt.grid()
     plt.show()
-    
+
+
 def correlation_map(data, features):
+    """
+    Plot the correlation heatmap
+
+    """
     cor_df = data[features].corr()
-    # Generate a mask for the upper triangle
     mask = np.triu(np.ones_like(cor_df, dtype=bool))
-    
-    # Set up the matplotlib figure
-    f, ax = plt.subplots(figsize=(16, 12))
 
-    # Generate a custom diverging colormap
+    plt.figure(figsize=(16, 12))
     cmap = sns.diverging_palette(230, 20, as_cmap=True)
-
-    # Draw the heatmap with the mask and correct aspect ratio
     sns.heatmap(cor_df, mask=mask, cmap=cmap, vmax=.3, center=0,
-            square=True, linewidths=.5, cbar_kws={"shrink": .5},  xticklabels=True, yticklabels=True)
+                square=True, linewidths=.5, cbar_kws={"shrink": .5}, xticklabels=True, yticklabels=True)
     plt.show()
     return cor_df
-    
