@@ -8,6 +8,7 @@ import random
 import dask_ml.model_selection as dcv
 import lightgbm as lgb
 import optuna
+import Processing
 
 import warnings
 
@@ -134,8 +135,10 @@ class PerformanceAnalysis:
         """
         Print and plot the confusion matrix.
         """
-        title = "Confusion matrix"
-        plt.figure(figsize=(6, 6))
+        title = self.which_data + ": Confusion matrix"
+        plt.figure(figsize=(14, 6))
+        plt.subplots_adjust(wspace=10)
+        plt.subplot(1, 2, 1)
         plt.imshow(self.cnf_matrix, interpolation="nearest", cmap=plt.cm.YlGn)  # BuGn
         plt.title(title, fontsize=15)
         plt.colorbar()
@@ -177,8 +180,7 @@ class PerformanceAnalysis:
             fpr, tpr, thresholds = roc_curve(self.data[self.y_var], self.classifier.predict(self.data[self.features]))
 
         roc_auc = auc(fpr, tpr)
-
-        plt.figure(figsize=(8, 6))
+        plt.subplot(1, 2, 2)
         plt.title(self.which_data + ":ROC", fontsize=15)
         plt.plot(fpr, tpr, "b", label="AUC = %0.3f" % roc_auc)
         plt.legend(loc="lower right", fontsize=15)
@@ -226,7 +228,7 @@ class DataSplit:
         """
         ID_list = self.data[self.unique_id].unique().tolist()
         random.seed(self.random_seed)
-        train_IDs = random.sample(ID_list, int(self.split_fraq * len(ID_list)))
+        train_IDs = random.sample(ID_list, int(self.split_frac * len(ID_list)))
 
         self.train_df = self.data[self.data[self.unique_id].isin(train_IDs)]
         self.test_df = self.data[~self.data[self.unique_id].isin(train_IDs)]
@@ -385,7 +387,7 @@ class FindUplift:
         data_prep = Processing.DataPrep()
         self.portfolio = data_prep.portfolio_prep()
         self.data["original_offer_id"] = self.data["offer_id"]
-        self.data["original_pred"] = gbm_model.predict(self.data[self.features])
+        self.data["original_pred"] = self.model.predict(self.data[self.features])
         self.offer_list = [
             "bogo_5_10",
             "bogo_5_5",
@@ -538,4 +540,4 @@ class FindUplift:
 
         self.model_auuc = gain["Model"].sum() / gain["Model"].shape[0]
         self.random_auuc = gain["RANDOM"].sum() / gain["RANDOM"].shape[0]
-        print(name, "AUUC:", self.model_auuc, "   Random AUUC:", self.random_auuc)
+        print(name, "AUUC:", round(self.model_auuc, 2), "   Random AUUC:", round(self.random_auuc,2))
