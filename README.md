@@ -29,9 +29,11 @@
     │
     └── Processing.py                   <- Processing module
     │
-    └── Modeling_Helper.py              <- Modeling Helper module
+    └── Modeling_Helper.py              <- Modeling Helper module 
     │
-    └── Project_Report.pdf              <- Project report file
+    └── proposal.pdf                    <- Proposal file
+    │
+    └── project-report.pdf              <- Project report file
 
 ## Project Overview
 <p align="justify"> In the Starbucks Capstone Challenge of Udacity's Machine Learning Engineer Nanodegree, we are given a number of simulated datasets which emulate customer behavior on the Starbucks rewards mobile app. This app is mainly used for sending either informational messages or promotional offers. A customer might be targeted by (1) informational advertisement, (2) discount offer, or (3) buy one get one free (BOGO) offer. The data provided includes the attributes of all offers available, the demographics of each customer, and the features of each transaction made. While it is not possible to send all the offers to all customers, the goal of this project is to extract insights from the data provided and identify customer segmentation and particular offers that they react to better. Additionally, the aim is to design a new recommendation system which specifies which offer (if any) should be given to an individual customer. </p>
