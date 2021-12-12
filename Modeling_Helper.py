@@ -161,8 +161,10 @@ class PerformanceAnalysis:
         """
         print("**************", "Performance:", self.which_data, "****************", "\n")
 
+        # make predictions
         y_pred = self.classifier.predict(self.data[self.features])
         y_pred = y_pred.round(0)
+        # find the confusion matrix
         self.cnf_matrix = confusion_matrix(self.data[self.y_var], y_pred)
         self.plot_confusion_matrix()
 
@@ -170,6 +172,8 @@ class PerformanceAnalysis:
         print("Precision:", round(precision_score(self.data[self.y_var], y_pred), 2))
         print("Recall:", round(recall_score(self.data[self.y_var], y_pred), 2))
         print("F1:", round(f1_score(self.data[self.y_var], y_pred), 2))
+
+        # calculate roc auc
 
         if self.prob:
 
@@ -180,6 +184,7 @@ class PerformanceAnalysis:
             fpr, tpr, thresholds = roc_curve(self.data[self.y_var], self.classifier.predict(self.data[self.features]))
 
         roc_auc = auc(fpr, tpr)
+        # plot ROC
         plt.subplot(1, 2, 2)
         plt.title(self.which_data + ":ROC", fontsize=15)
         plt.plot(fpr, tpr, "b", label="AUC = %0.3f" % roc_auc)
@@ -226,6 +231,7 @@ class DataSplit:
         Split data randomly into train and test
 
         """
+        # randomly split data into train and test, making sure one user only belongs to one of the sets
         ID_list = self.data[self.unique_id].unique().tolist()
         random.seed(self.random_seed)
         train_IDs = random.sample(ID_list, int(self.split_frac * len(ID_list)))
@@ -265,6 +271,7 @@ class BayesianOpt(object):
         Run an iteration of bayesian optimization
 
         """
+        # find random samples for each parameter
         learning_rate = trial.suggest_float("learning_rate", 1e-3, 0.4, log=True)
         num_leaves = trial.suggest_int("num_leaves", 2, 60)
         colsample_bytree = trial.suggest_float("colsample_bytree", 0.2, 1)
@@ -288,12 +295,14 @@ class BayesianOpt(object):
             "verbose": [-1]
         }
 
+        # train a GBM model
         gbm_model = lgb.LGBMClassifier(objective="binary",
                                        metric=["auc", "binary_error"],
                                        random_state=2021,
                                        n_jobs=-1,
                                        scale_pos_weight=self.scale_pos_weight_val,
                                        )
+        # find the f1 score using cross validation
         gbm_gs = dcv.GridSearchCV(
             estimator=gbm_model, param_grid=param,
             scoring="f1",
@@ -387,6 +396,7 @@ class FindUplift:
         data_prep = Processing.DataPrep()
         self.portfolio = data_prep.portfolio_prep()
         self.data["original_offer_id"] = self.data["offer_id"]
+        # find the original predictions
         self.data["original_pred"] = self.model.predict(self.data[self.features])
         self.offer_list = [
             "bogo_5_10",
@@ -404,6 +414,7 @@ class FindUplift:
         Predict the uplift using the model
 
         """
+        # iterate through the list of offer types and make new predictions
         for i in self.portfolio["offer_id"].unique().tolist():
             temp = self.portfolio[self.portfolio["offer_id"] == i].reset_index(drop=True)
             self.data["offer_id"] = i
@@ -422,12 +433,15 @@ class FindUplift:
             for j in self.cat_vars:
                 self.data.loc[:, j] = self.data[j].astype("category")
             self.data[i] = self.model.predict(self.data[self.features])
+        # control probability is defined as the max of probs among informational_3 and informational_4
         self.data["informational"] = self.data[["informational_3", "informational_4"]].max(axis=1)
 
+        # find the uplift
         for i in self.offer_list:
             self.data[i] = self.data[i] - self.data["informational"]
         self.data["informational"] = 0
 
+        # find the max uplift and its associated offer type
         self.data["recom_offer"] = self.data[["bogo_5_10",
                                               "bogo_5_5",
                                               "discount_10_2",
@@ -451,6 +465,7 @@ class FindUplift:
         Predict the baseline uplift.
 
         """
+        # find control probability
         for i in ["informational_3", "informational_4"]:
             temp = self.portfolio[self.portfolio["offer_id"] == i].reset_index(drop=True)
             self.data["offer_id"] = i
@@ -470,6 +485,7 @@ class FindUplift:
                 self.data.loc[:, j] = self.data[j].astype("category")
             self.data[i] = self.model.predict(self.data[self.features])
         self.data["informational"] = self.data[["informational_3", "informational_4"]].max(axis=1)
+        # find original uplift
         self.data["original_uplift"] = self.data["original_pred"] - self.data["informational"]
 
     def calculate_auuc(self, original_uplift=False):
@@ -485,8 +501,13 @@ class FindUplift:
             self.data["best_uplift"] = self.data["original_uplift"]
 
         df_preds = self.data[["best_uplift", treat_var, self.y_var]]
+        # specify whether an user is treated or not
         df_preds["is_treated"] = np.where(self.data[treat_var].isin(["informational_3", "informational_4"]), 0, 1)
+        # sort users by predicted uplift
         df_preds = df_preds.sort_values("best_uplift", ascending=False).reset_index(drop=True)
+        # find the cumulative number of successful offers in the treatment group \
+        # (scaled by the cumulative treatment size) minus the cumulative number of
+        # successful offers in the control group (scaled by the cumulative control size)
         df_preds.index = df_preds.index + 1
         df_preds["cumsum_tr"] = df_preds["is_treated"].cumsum()
         df_preds["cumsum_ct"] = df_preds.index.values - df_preds["cumsum_tr"]
@@ -497,6 +518,7 @@ class FindUplift:
         lift = []
         lift.append(df_preds["cumsum_y_tr"] / df_preds["cumsum_tr"] - df_preds["cumsum_y_ct"] / df_preds["cumsum_ct"])
 
+        # randomly sort users and recalculate the cumulative gain 40 times
         np.random.seed(2021)
 
         for i in range(40):
@@ -522,10 +544,12 @@ class FindUplift:
         lift.columns = model_names
         lift["RANDOM"] = lift[model_names[1:]].mean(axis=1)
         lift.drop(model_names[1:], axis=1, inplace=True)
+        # find the cumulative gain
         gain = lift.mul(lift.index.values, axis=0)
 
         gain = gain.iloc[np.linspace(0, gain.index[-1], 100, endpoint=True)]
 
+        # plot uplift curve
         plt.figure(figsize=(7, 6))
         pp = plt.plot(gain)
         plt.xlabel("Population")
@@ -538,6 +562,7 @@ class FindUplift:
         plt.legend([pp[0], pp[1]], [name, "Random"])
         plt.show()
 
+        # calculate model's and the random AUUC
         self.model_auuc = gain["Model"].sum() / gain["Model"].shape[0]
         self.random_auuc = gain["RANDOM"].sum() / gain["RANDOM"].shape[0]
         print(name, "AUUC:", round(self.model_auuc, 2), "   Random AUUC:", round(self.random_auuc,2))

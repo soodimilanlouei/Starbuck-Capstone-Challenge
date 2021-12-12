@@ -40,15 +40,17 @@ class DataPrep:
         Prepare the portfolio data.
 
         """
+        # convert channels column into dummy variables
         self.portfolio = pd.concat([self.portfolio[["reward", "difficulty", "duration", "offer_type", "id"]],
                                     pd.get_dummies(self.portfolio["channels"].apply(pd.Series),
                                                    prefix="channel")], axis=1)
         self.portfolio = self.portfolio.groupby(self.portfolio.columns, axis=1).sum()
+        # find the number of channels for each offer
         self.portfolio["num_channels"] = self.portfolio[
             ["channel_email", "channel_mobile", "channel_social", "channel_web"]].sum(axis=1)
 
         self.portfolio.rename(columns={"id": "offer_id", "reward": "offer_reward"}, inplace=True)
-
+        # rename offer ids for readability. format: offer type, duration, reward
         self.portfolio["offer_id"].replace(
             {
                 "ae264e3637204a6fb9bb56bc8210ddfd": "bogo_7_10",
@@ -79,23 +81,31 @@ class DataPrep:
         Prepare the profile data.
 
         """
+        # rename user ids for readability
         original_ids = self.profile["id"].unique()
         for counter in range(len(original_ids)):
-            self.new_ids[original_ids[counter]] = "user_" + str(counter + 1)
+            self.new_ids[original_ids[counter]] = "user_" + str(
+                counter + 1)  # preserve new_ids to apply onto transcripts
 
         self.profile["id"] = self.profile["id"].map(self.new_ids)
 
         self.profile.rename(columns={"id": "person"}, inplace=True)
 
         self.profile["became_member_on"] = pd.to_datetime(self.profile["became_member_on"], format="%Y%m%d")
+        # find the membership days
         self.profile["membership_days"] = datetime.datetime.today().date() - pd.to_datetime(
             self.profile["became_member_on"], format="%Y%m%d").dt.date
         self.profile["membership_days"] = self.profile["membership_days"].dt.days
+        # find the membership month
         self.profile["membership_month"] = self.profile["became_member_on"].dt.month
+        # find the membership year
         self.profile["membership_year"] = self.profile["became_member_on"].dt.year
+        # replace age of 118 with NAN
         self.profile["age"] = np.where(self.profile["age"] == 118, np.nan, self.profile["age"])
+        # replace None gender with NAN
         self.profile["gender"] = np.where(self.profile["gender"] == None, np.nan, self.profile["gender"])
         self.profile["gender"].replace([None], np.nan, inplace=True)
+        # drop rows with info missing (12%)
         self.profile = self.profile.dropna().reset_index(drop=True)
 
         return self.profile
@@ -105,11 +115,13 @@ class DataPrep:
         Prepare the transcript data.
 
         """
+        # parse column 'value'
         self.transcript = pd.concat(
             [self.transcript.drop(["value"], axis=1), self.transcript["value"].apply(pd.Series)], axis=1)
         self.transcript["offer_id"] = np.where(self.transcript["offer id"].isnull(), self.transcript["offer_id"],
                                                self.transcript["offer id"])
         del self.transcript["offer id"]
+        # rename values in column 'event'
         self.transcript["event"].replace(
             {
                 "offer received": "offer_received",
@@ -118,7 +130,7 @@ class DataPrep:
             },
             inplace=True,
         )
-
+        # rename offer ids
         self.transcript["offer_id"].replace(
             {
                 "ae264e3637204a6fb9bb56bc8210ddfd": "bogo_7_10",
@@ -135,6 +147,7 @@ class DataPrep:
             },
             inplace=True,
         )
+        # use new_ids to rename user ids
         self.transcript["person"] = self.transcript["person"].map(self.new_ids)
 
         return self.transcript
@@ -191,6 +204,7 @@ def describe_portfolio_plot(portfolio):
     plt.figure(figsize=(18, 5))
     plt.subplot(1, 3, 1)
     plt.rc("axes", axisbelow=True)
+    # bar chart: number of channels for each offer type
     plt.bar(portfolio["offer_id"], portfolio["num_channels"], color="teal")
     plt.xticks(rotation=90)
     plt.yticks(np.arange(0, 5, 1))
@@ -198,6 +212,7 @@ def describe_portfolio_plot(portfolio):
     plt.grid()
     plt.subplot(1, 3, 2)
     plt.rc("axes", axisbelow=True)
+    # bar chart: difficulty of each offer type
     plt.bar(portfolio["offer_id"], portfolio["difficulty"], color="teal")
     plt.xticks(rotation=90)
     plt.yticks(np.arange(0, 25, 5))
@@ -205,6 +220,7 @@ def describe_portfolio_plot(portfolio):
     plt.grid()
     plt.subplot(1, 3, 3)
     plt.rc("axes", axisbelow=True)
+    # bar chart: duration of each offer type
     plt.bar(portfolio["offer_id"], portfolio["duration"], color="teal")
     plt.xticks(rotation=90)
     plt.yticks(np.arange(0, 12, 2))
@@ -224,6 +240,7 @@ def describe_profile_categorical(profile):
     plt.rc("axes", axisbelow=True)
     membership_month = pd.DataFrame(profile["membership_month"].value_counts())
     membership_month = membership_month.sort_index()
+    # bar chart: number of users in each month. assign a color to each quarter
     plt.bar(membership_month.index, membership_month["membership_month"], color=["green", "green", "green",
                                                                                  "yellow", "yellow", "yellow",
                                                                                  "orange", "orange", "orange",
@@ -237,6 +254,7 @@ def describe_profile_categorical(profile):
     plt.rc("axes", axisbelow=True)
     membership_year = pd.DataFrame(profile["membership_year"].value_counts())
     membership_year = membership_year.sort_index()
+    # bar chart: number of users in each year.
     plt.bar(membership_year.index, membership_year["membership_year"], color="teal")
     plt.plot(membership_year.index, membership_year["membership_year"], "-o", color="orange")
     plt.xlabel("Registration Year", fontsize=15)
@@ -246,6 +264,7 @@ def describe_profile_categorical(profile):
     plt.subplot(1, 3, 3)
     plt.rc("axes", axisbelow=True)
     gender = pd.DataFrame(profile["gender"].value_counts())
+    # bar chart: number of users by gender
     bar_chart = plt.bar(gender.index, gender["gender"], color="teal")
     plt.xlabel("Gender", fontsize=15)
     plt.ylabel("Number of Users", fontsize=15)
@@ -265,30 +284,34 @@ def describe_profile_continuous(profile):
 
     """
     fig, (ax1, ax2, ax3) = plt.subplots(ncols=3, sharey=False, figsize=(20, 6))
-
+    # density plot of users' age
     p = sns.kdeplot(data=profile, x="age", shade=True, color="teal", ax=ax1, bw=0.3)
     p.set_xlabel("Age", fontsize=15)
     p.set_ylabel("Density", fontsize=15)
 
+    # density plot of users' income
     p = sns.kdeplot(data=profile, x="income", shade=True, color="teal", ax=ax2, bw=0.3)
     p.set_xlabel("Income", fontsize=15)
     p.set_ylabel("Density", fontsize=15)
 
+    # density plot of users' membership days
     p = sns.kdeplot(data=profile, x="membership_days", shade=True, color="teal", ax=ax3, bw=0.3)
     p.set_xlabel("Membership Days", fontsize=15)
     p.set_ylabel("Density", fontsize=15)
     plt.show()
 
     fig, (ax1, ax2, ax3) = plt.subplots(ncols=3, sharey=False, figsize=(20, 6))
-
+    # density plot of users' age by gender
     p = sns.kdeplot(data=profile, x="age", hue="gender", shade=True, ax=ax1, bw=0.3)
     p.set_xlabel("Age", fontsize=15)
     p.set_ylabel("Density", fontsize=15)
 
+    # density plot of users' income by gender
     p = sns.kdeplot(data=profile, x="income", hue="gender", shade=True, ax=ax2, bw=0.3)
     p.set_xlabel("Income", fontsize=15)
     p.set_ylabel("Density", fontsize=15)
 
+    # density plot of users' membership days by gender
     p = sns.kdeplot(data=profile, x="membership_days", hue="gender", shade=True, ax=ax3, bw=0.3)
     p.set_xlabel("Membership Day", fontsize=15)
     p.set_ylabel("Density", fontsize=15)
@@ -306,10 +329,12 @@ def describe_transcript_plot(transcript):
     plt.rc("axes", axisbelow=True)
 
     transcript["counter"] = 1
+    # find the number of offers sent to each user
     offers_sent = transcript[transcript["event"] == "offer_received"].groupby(["person"])[
         ["counter"]].sum().reset_index()
     offers_sent["Frequency"] = 1
     offers_sent = offers_sent.groupby(["counter"])[["Frequency"]].sum().reset_index()
+    # plot the frequency
     bar_chart = plt.bar(offers_sent["counter"], offers_sent["Frequency"], color="teal")
     plt.xlabel("Number of Received Offers", fontsize=15)
     plt.ylabel("Frequency", fontsize=15)
@@ -321,10 +346,12 @@ def describe_transcript_plot(transcript):
                  ha="center")
     plt.subplot(1, 3, 2)
 
+    # find the number of offers viewed by each user
     offers_viewed = transcript[transcript["event"] == "offer_viewed"].groupby(["person"])[
         ["counter"]].sum().reset_index()
     offers_viewed["Frequency"] = 1
     offers_viewed = offers_viewed.groupby(["counter"])[["Frequency"]].sum().reset_index()
+    # plot frequency
     bar_chart = plt.bar(offers_viewed["counter"], offers_viewed["Frequency"], color="teal")
     plt.xlabel("Number of Viewed Offers", fontsize=15)
     plt.ylabel("Frequency", fontsize=15)
@@ -336,8 +363,10 @@ def describe_transcript_plot(transcript):
                  ha="center")
     plt.subplot(1, 3, 3)
 
+    # find the number of times each offer type was sent
     offers_frequency = transcript[transcript["event"] == "offer_received"].groupby(["offer_id"])[
         ["counter"]].sum().reset_index()
+    # plot frequency
     bar_chart = plt.bar(offers_frequency["offer_id"], offers_frequency["counter"], color="teal")
     for p in bar_chart:
         height = p.get_height()
@@ -374,29 +403,35 @@ class DataMerge:
         Reformat the transcript data.
 
         """
+        # filter events on received offers
         offer_received = self.transcript[self.transcript["event"] == "offer_received"].copy(deep=True).reset_index(
             drop=True)
         offer_received = offer_received.drop(["amount", "event"], axis=1)
         offer_received.rename(columns={"time": "time_received", "reward": "original_reward"}, inplace=True)
 
+        # filter events on viewed offers
         offer_viewed = self.transcript[self.transcript["event"] == "offer_viewed"].copy(deep=True).reset_index(
             drop=True)
         offer_viewed = offer_viewed.drop(["amount", "event", "reward"], axis=1)
         offer_viewed.rename(columns={"time": "time_viewed"}, inplace=True)
 
+        # filter events on transactions
         transaction = self.transcript[self.transcript["event"] == "transaction"].copy(deep=True).reset_index(drop=True)
         transaction = transaction.drop(["event", "reward", "offer_id"], axis=1)
         transaction.rename(columns={"time": "time_transaction"}, inplace=True)
 
+        # filter events on completed offers
         offer_completed = self.transcript[self.transcript["event"] == "offer_completed"].copy(deep=True).reset_index(
             drop=True)
         offer_completed = offer_completed.drop(["event", "amount"], axis=1)
         offer_completed.rename(columns={"time": "time_completed"}, inplace=True)
 
+        # merge all four subsets on 'person' and 'offer_id'
         self.merged_data = offer_received.merge(offer_viewed, on=["person", "offer_id"], how="outer")
         self.merged_data = self.merged_data.merge(transaction, on=["person"], how="outer")
         self.merged_data = self.merged_data.merge(offer_completed, on=["person", "offer_id"], how="outer")
 
+        # append portfolio data
         self.merged_data = self.merged_data.merge(self.portfolio[["offer_id", "duration"]], on=["offer_id"], how="left")
         self.merged_data = self.merged_data[
             ["person", "offer_id", "original_reward", "time_received", "duration", "time_viewed", "time_transaction",
@@ -411,6 +446,7 @@ class DataMerge:
         Remove the observations that are redundantly created in the merge step
 
         """
+        # apply a set of logics to remove redundant rows
         self.merged_data = self.merged_data[
             ((self.merged_data["time_viewed"].isnull()) & (self.merged_data["time_completed"].isnull())) |
             ((self.merged_data["time_viewed"] >= self.merged_data["time_received"]) & (
@@ -431,10 +467,13 @@ class DataMerge:
         Specify whether an offer has been tried or has been successful.
 
         """
+        # filter merged data on offers which are not viewed.
         not_viewed_data = self.merged_data[self.merged_data["time_viewed"].isnull()].reset_index(drop=True)
         not_viewed_data = not_viewed_data.sort_values(
             by=["person", "offer_id", "time_received", "time_transaction"]).reset_index(drop=True)
+        # these offers are definitely unsuccessful
         not_viewed_data["successful_offer"] = 0
+        # apply a set of logics to determine whether an offer was tried or not
         not_viewed_data["tried_offer"] = np.where(
             (not_viewed_data["offer_id"].isin(["informational_4", "informational_3"])) &
             (not_viewed_data["time_transaction"] <= not_viewed_data["time_received"] + not_viewed_data["duration"]) &
@@ -446,6 +485,8 @@ class DataMerge:
         not_viewed_data = not_viewed_data.drop(["time_transaction", "amount"], axis=1)
         not_viewed_data = not_viewed_data.drop_duplicates().reset_index(drop=True)
 
+        # viewed offers might be successful or not.
+        # apply a set of logics to determine the success of an offer
         viewed_data = self.merged_data[~self.merged_data["time_viewed"].isnull()].reset_index(drop=True)
         viewed_data["successful_offer"] = np.where(
             (viewed_data["offer_id"].isin(["informational_4", "informational_3"])) & (
@@ -461,6 +502,7 @@ class DataMerge:
             (viewed_data["time_transaction"] <= viewed_data["time_received"] + viewed_data["duration"]),
             1, viewed_data["successful_offer"])
 
+        # apply logics to specify whether an offer was tried
         viewed_data["tried_offer"] = np.where(
             (viewed_data["time_transaction"] <= viewed_data["time_received"] + viewed_data["duration"]) & (
                     viewed_data["time_transaction"] >= viewed_data["time_received"]), 1, 0)
@@ -483,6 +525,7 @@ class DataMerge:
             ["person", "offer_id", "original_reward", "duration", "time_received", "reward", "time_viewed",
              ])[["successful_offer", "tried_offer"]].max().reset_index()
 
+        # concatenate both tables
         self.merged_data = pd.concat([not_viewed_data, viewed_data], ignore_index=True)
 
         return self.merged_data
@@ -492,7 +535,9 @@ class DataMerge:
         Append other datasets to create a unified view
 
         """
+        # append profile data
         self.merged_data = self.merged_data.merge(self.profile, on="person", how="left")
+        # append portfolio data
         self.merged_data = self.merged_data.merge(self.portfolio, on=["offer_id", "duration"], how="left")
         self.merged_data = self.merged_data.dropna(subset=["gender", "age", "person", "became_member_on",
                                                            "income", "membership_days", "membership_month",
@@ -514,13 +559,16 @@ def offer_performance(data, by_var):
     Plot the performance of each offer for various segmentations.
 
     """
+    # find 5 segmentation for age
     if by_var == "age":
         data["age_groups"] = pd.qcut(data["age"], 5, labels=["very_young", "young", "middle_age", "old", "very_old"])
         by_var = "age_groups"
+    # find 5 segmentation for income
     if by_var == "income":
         data["income_groups"] = pd.qcut(data["income"], 5, labels=["very low", "low", "medium", "high", "very high"])
         by_var = "income_groups"
 
+    # calculate the trying rate and success rate by each segment
     output = data.groupby([by_var])["tried_offer", "successful_offer"].mean().reset_index()
 
     plt.figure(figsize=(20, 5))
@@ -547,7 +595,9 @@ def correlation_map(data, features):
     Plot the correlation heatmap
 
     """
+    # calculate the correlation among features
     cor_df = data[features].corr()
+    # create a mask to hide half of the correlations
     mask = np.triu(np.ones_like(cor_df, dtype=bool))
 
     plt.figure(figsize=(16, 12))
